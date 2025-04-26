@@ -10,8 +10,10 @@ import torch
 import nltk
 from nltk.tokenize import sent_tokenize
 from collections import Counter
+from rouge_score import rouge_scorer
 
 nltk.download("punkt", quiet=True)
+nltk.download("punkt_tab")
 
 # --- Constants ---
 ABSTRACTIVE_MODEL_NAME = "facebook/bart-large-cnn"
@@ -234,8 +236,10 @@ def generate_clinical_summary(topic_terms, clinical_facts):
         parts.append(f"Statistical results: {', '.join(clinical_facts['stats'])}")
 
     return "\n".join(parts)
-
-
+#rouge score
+def compute_rouge(reference, candidate):
+    scorer = rouge_scorer.RougeScorer(["rouge1", "rouge2", "rougeL"], use_stemmer=True)
+    return scorer.score(reference, candidate)
 # --- Main Pipeline ---
 def main():
     print("Loading dataset...")
@@ -288,8 +292,10 @@ def main():
                 # Fall back to extractive if not enough  content
                 extract_summary = summarize_extractive(topic_abstracts)
                 summary = summarize_abstractive(extract_summary)
+            reference_summary = summarize_extractive(topic_abstracts)
+            rouge_scores = compute_rouge(reference_summary, summary)
 
-            topics.append({"id": topic_id + 1, "terms": terms, "summary": summary})
+            topics.append({"id": topic_id + 1, "terms": terms, "summary": summary,"rouge_scores": rouge_scores})
 
         results[str(class_name)] = {"topics": topics}
 
@@ -305,6 +311,9 @@ def main():
     with open("medical_summaries_improved.json", "w") as f:
         json.dump(results, f, indent=2)
     print("Processing complete.")
+
+    #print rouge scores
+    print(f"Topic {topic_id + 1} ROUGE Scores: {rouge_scores}")
 
 
 if __name__ == "__main__":
